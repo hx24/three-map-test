@@ -55,7 +55,7 @@ export default {
     },
 };
 </script>
-<style lang="scss" scoped>
+<style lang="less" scoped>
 .china-chart{
     position: relative;
     width: 100%;
