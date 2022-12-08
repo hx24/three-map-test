@@ -8,7 +8,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial'
 
 import dotsTexture from './textures/dots.png'
-// import hmbbTexture from './textures/hmbb.jpeg'
+// import dotsTexture from './textures/hmbb.jpeg'
 
 import px from './textures/cube/px.png'
 import py from './textures/cube/py.png'
@@ -625,49 +625,44 @@ export default class LMap {
             }
             shape.lineTo(x, -y) // 从当前点画一条直线到(x,y)
 
-            // points.push(new THREE.Vector2(x, -y))
             points.push(x, -y, 0)
           }
 
-          // const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
-          // const lineMaterial = new THREE.LineBasicMaterial({ color: 'rgb(118, 206, 245)', linewidth: 5 })
           const lineGeometry = new LineGeometry()
           lineGeometry.setPositions(points)
           const lineMaterial = new LineMaterial({
             color: 'rgb(118, 206, 245)',
-            linewidth: 1.5,
+						transparent: true
           })
           // const line = new THREE.Line(lineGeometry, lineMaterial)
           const line = new Line2(lineGeometry, lineMaterial)
           lineMaterial.resolution.set(this.width, this.height)
 
           line.computeLineDistances()
-          line.position.z = 5
+          line.position.z = 3
           province.add(line)
 
-          // function genMapMesh() {
-          // 	const geometry = new THREE.ShapeGeometry(shape)
-          // 	const material = new THREE.MeshBasicMaterial({  })
-          // 	const mesh = new THREE.Mesh(geometry, material)
-          // 	province.add(mesh)
-          // 	return mesh
-          // }
+          function genMapMesh() {
+            const geometry = new THREE.ShapeGeometry(shape)
+            const material = new THREE.MeshBasicMaterial({
+							transparent: true
+						})
+            const mesh = new THREE.Mesh(geometry, material)
+            province.add(mesh)
+            return mesh
+          }
 
-          // const mesh1 = genMapMesh()
-          // mesh1.material.map = texture
-          // mesh1.position.z = 5
+          const mesh1 = genMapMesh()
+          mesh1.material.map = texture
+          mesh1.position.z = 3
 
-          // const mesh2 = genMapMesh()
-          // // 修改颜色
-          // mesh2.material.color = new THREE.Color('rgb(41, 110, 203)')
-          // mesh2.position.z = 4.7
-          // mesh2.position.y -= 0.3
-          // mesh2.position.x += 0.3
+          const mesh2 = genMapMesh()
+          // 修改颜色
+          mesh2.material.color = new THREE.Color('rgb(41, 110, 203)')
+          mesh2.position.z = 2.9
+          mesh2.position.y -= 0.3
+          mesh2.position.x += 0.3
 
-          // const lineMaterial = new THREE.LineBasicMaterial({ color: 'white' })
-          // const line = new THREE.Line(geometry, lineMaterial)
-          // line.position.z = 5
-          // province.add(line)
         })
       })
 
