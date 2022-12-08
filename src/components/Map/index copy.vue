@@ -35,7 +35,7 @@ export default {
         this.init();
     },
     beforeDestroy() {
-        // this.mapObj.destroyed()
+        this.mapObj.destroyed()
     },
     methods: {
         init() {
@@ -47,7 +47,7 @@ export default {
                 }
             );
             this.mapObj.init();
-            // this.mapObj.setTag(this.tagData)
+            this.mapObj.setTag(this.tagData)
         },
         tagClick(v) {
             this.$emit('tagClick', v)
