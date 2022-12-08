@@ -6,8 +6,11 @@ import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerat
 import { Line2 } from 'three/examples/jsm/lines/Line2'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial'
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
+// import helvetiker from 'three/examples/fonts/helvetiker_regular.typeface.json'
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 
-import dotsTexture from './textures/dots.png'
+import dotsTexture from './textures/dot6.png'
 // import dotsTexture from './textures/hmbb.jpeg'
 
 import px from './textures/cube/px.png'
@@ -292,7 +295,7 @@ export class lineMap {
     // TWEEN.update()
   }
 
-  setRayCaster() {
+  setRaycaster() {
     this.raycaster = new THREE.Raycaster()
     this.mouse = new THREE.Vector2()
     this.eventOffset = {}
@@ -509,7 +512,7 @@ export default class LMap {
     this.container = container ? container : document.body
     this.width = this.container.offsetWidth
     this.height = this.container.offsetHeight
-    // this.group =  new THREE.Group() // 各省份的标注（地名）
+    this.group = new THREE.Group() // 各省份的标注（地名）
     this.renderer = null
   }
 
@@ -525,6 +528,8 @@ export default class LMap {
     this.initMap()
 
     this.initPlayGround()
+
+    this.setResize()
   }
 
   initRenderer() {
@@ -566,6 +571,18 @@ export default class LMap {
     this.scene.add(axesHelper)
   }
 
+  setResize() {
+    window.addEventListener('resize', this.resizeEventHandle.bind(this))
+  }
+
+  resizeEventHandle() {
+    this.width = this.container.offsetWidth
+    this.height = this.container.offsetHeight
+    this.camera.aspect = this.width / this.height
+    this.camera.updateProjectionMatrix()
+    this.renderer.setSize(this.width, this.height)
+  }
+
   animate() {
     requestAnimationFrame(this.animate.bind(this))
     this.renderer.render(this.scene, this.camera)
@@ -603,7 +620,7 @@ export default class LMap {
     const texture = new THREE.TextureLoader().load(dotsTexture)
     texture.wrapS = THREE.RepeatWrapping
     texture.wrapT = THREE.RepeatWrapping
-    texture.repeat.set(4, 4)
+    texture.repeat.set(0.5, 0.5) // 在一个纹理原图大小的基础上，重复多少次，1就是原图大小，2是在原图大小的基础上重复2次，则没张图显示为原来的一半
 
     // 遍历json数据
     features.forEach((feature) => {
@@ -632,7 +649,7 @@ export default class LMap {
           lineGeometry.setPositions(points)
           const lineMaterial = new LineMaterial({
             color: 'rgb(118, 206, 245)',
-						transparent: true
+            transparent: true,
           })
           // const line = new THREE.Line(lineGeometry, lineMaterial)
           const line = new Line2(lineGeometry, lineMaterial)
@@ -645,8 +662,8 @@ export default class LMap {
           function genMapMesh() {
             const geometry = new THREE.ShapeGeometry(shape)
             const material = new THREE.MeshBasicMaterial({
-							transparent: true
-						})
+              transparent: true,
+            })
             const mesh = new THREE.Mesh(geometry, material)
             province.add(mesh)
             return mesh
@@ -659,9 +676,9 @@ export default class LMap {
           const mesh2 = genMapMesh()
           // 修改颜色
           mesh2.material.color = new THREE.Color('rgb(41, 110, 203)')
-          mesh2.position.z = 2.9
-          mesh2.position.y -= 0.3
-          mesh2.position.x += 0.3
+          mesh2.position.z = 2.98
+          mesh2.position.y -= 0.1
+          mesh2.position.x += 0.1
 
         })
       })
@@ -679,6 +696,144 @@ export default class LMap {
     })
 
     this.scene.add(this.map)
+  }
+
+  setTag(_data = []) {
+    if (!_data?.length) return
+    // this.scene.remove(this.group)
+    this.group = new THREE.Object3D()
+
+		// 创建文字
+		// const loader = new FontLoader();
+    // loader.load('/fonts/helvetiker_regular.typeface.json', (font) => {
+    //   const geometry = new TextGeometry('Hello three.js!', {
+    //     font: font,
+    //     size: 4,
+    //     height: 0.1,
+    //   })
+		// 	// 创建面材质
+		// 	const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+		// 	const text = new THREE.Mesh(geometry, material)
+		// 	text.position.z = 10
+		// 	this.scene.add(text)
+    // })
+
+    function paintTag(scale = 1) {
+      let spriteMap = new THREE.TextureLoader().load(tag)
+
+      _data.forEach((d) => {
+        // 必须是不同的材质，否则鼠标移入时，修改材质会全部都修改
+        let spriteMaterial = new THREE.SpriteMaterial({
+          map: spriteMap,
+          color: 0xffffff,
+        })
+        const { value } = d
+        // 添加标点
+        const sprite1 = new THREE.Sprite(spriteMaterial)
+
+        if (value && value.length !== 0) {
+          let [x, y] = projection(value)
+          sprite1.position.set(x, -y + 2, 6)
+        }
+        sprite1._data = d
+        sprite1.scale.set(20 * scale, 30 * scale, 80 * scale)
+
+        this.group.add(sprite1)
+      })
+      spriteMap.dispose()
+    }
+
+    function setScale(scale = 1) {
+      this.group.children.forEach((s) => {
+        s.scale.set(2 * scale, 3 * scale, 8 * scale)
+      })
+    }
+
+    this.scene.add(this.group)
+
+    paintTag.call(this, 0.1)
+
+    let tween = new TWEEN.Tween({ val: 0.1 })
+      .to(
+        {
+          val: 1.2,
+        },
+        1.5 * 1000,
+      )
+      .easing(TWEEN.Easing.Quadratic.InOut)
+      .onUpdate((d) => {
+        //高度增加动画
+        setScale.call(this, d.val)
+      })
+    tween.start()
+
+    if (this.raycaster) {
+      this.raycaster.setFromCamera(this.mouse, this.camera)
+    }
+    this.renderer.render(this.scene, this.camera)
+    console.log('render info', this.renderer.info)
+    // TWEEN.update()
+  }
+
+  // 设置射线 鼠标选中
+  setRaycaster() {
+    this.raycaster = new THREE.Raycaster()
+    this.mouse = new THREE.Vector2()
+
+    this.eventOffset = {}
+    var _this = this
+
+    // 鼠标移动事件 控制
+    function onMouseMove(event) {
+      // 父级并非满屏，所以需要减去父级的left 和 top
+      let { top, left, width, height } = _this.container.getBoundingClientRect()
+      // 获取以容器左上角为原点的鼠标坐标
+      let clientX = event.clientX - left
+      let clientY = event.clientY - top
+
+      _this.mouse.x = (clientX / width) * 2 - 1
+      _this.mouse.y = -(clientY / height) * 2 + 1
+
+      _this.eventOffset.x = clientX
+      _this.eventOffset.y = clientY
+      _this.provinceInfo.style.left = _this.eventOffset.x + 10 + 'px'
+      _this.provinceInfo.style.top = _this.eventOffset.y - 20 + 'px'
+    }
+
+    // 标注
+    function onPointerMove() {
+      if (_this.selectedObject) {
+        _this.selectedObject.material.color.set(0xffffff)
+        _this.selectedObject = null
+      }
+
+      if (_this.raycaster) {
+        const intersects = _this.raycaster.intersectObject(_this.group, true)
+        // console.log('select group', intersects)
+        if (intersects.length > 0) {
+          const res = intersects.filter(function (res) {
+            return res && res.object
+          })[intersects.length - 1]
+
+          if (res && res.object) {
+            _this.selectedObject = res.object
+            _this.selectedObject.material.color.set('#f00')
+          }
+        }
+      }
+    }
+
+    // 标注点击
+    function onClick() {
+      if (_this.selectedObject) {
+        // 输出标注信息
+        console.log(_this.selectedObject._data)
+        _this.tagClick(_this.selectedObject._data)
+      }
+    }
+    window.addEventListener('mousemove', onMouseMove, false)
+    document.addEventListener('pointermove', onPointerMove)
+    document.addEventListener('click', onClick)
   }
 
   // 绘制地面(平面)
