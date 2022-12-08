@@ -286,7 +286,7 @@ export class lineMap {
     // TWEEN.update()
   }
 
-  setRaycaster() {
+  setRayCaster() {
     this.raycaster = new THREE.Raycaster()
     this.mouse = new THREE.Vector2()
     this.eventOffset = {}
@@ -512,10 +512,13 @@ export default class LMap {
     this.initScene()
     this.initCamera()
     this.initControls()
+    this.initAxis()
 
     this.animate()
 
     this.initMap()
+
+    this.initPlayGround()
   }
 
   initRenderer() {
@@ -552,6 +555,11 @@ export default class LMap {
     this.controls = controls
   }
 
+  initAxis() {
+    const axesHelper = new THREE.AxesHelper(100)
+    this.scene.add(axesHelper)
+  }
+
   animate() {
     requestAnimationFrame(this.animate.bind(this))
     this.renderer.render(this.scene, this.camera)
@@ -559,6 +567,39 @@ export default class LMap {
   }
 
   initMap() {
+    if (!this) {
+      const points = []
+
+      points.push(new THREE.Vector2(0, 0))
+      points.push(new THREE.Vector2(0, 10))
+      points.push(new THREE.Vector2(10, 10))
+      points.push(new THREE.Vector2(8, 6))
+      points.push(new THREE.Vector2(10, 0))
+      points.push(new THREE.Vector2(0, 0))
+
+      const geometry = new THREE.BufferGeometry().setFromPoints(points)
+      const material = new THREE.LineBasicMaterial({ color: 'white' })
+      const line = new THREE.Line(geometry, material)
+
+      line.position.z = 10
+      this.scene.add(line)
+
+      // const shape = new THREE.Shape() // Shape用来画多边形
+      // shape.moveTo(0, 0)
+      // shape.lineTo(0, 10)
+      // shape.lineTo(10, 10)
+      // shape.lineTo(8, 6)
+      // // shape.lineTo(5, 4)
+      // shape.lineTo(10, 0)
+      // shape.lineTo(0, 0)
+      // const geometry = new THREE.ShapeGeometry(shape)
+      // const material = new THREE.LineBasicMaterial({ color: 'white' })
+      // const mesh = new THREE.Line(geometry, material)
+      // mesh.position.z = 10
+      // this.scene.add(mesh)
+      return
+    }
+
     const jsonData = require('./json/china.json')
     // 建一个空对象存放对象
     this.map = new THREE.Object3D()
@@ -578,21 +619,34 @@ export default class LMap {
           // polygon - 多边形 内部是多个点（坐标数组）
           const shape = new THREE.Shape() // Shape用来画多边形
 
+          const points = []
           for (let i = 0; i < polygon.length; i++) {
             let [x, y] = projection(polygon[i]) // 经纬度转二维投影坐标
             if (i === 0) {
               shape.moveTo(x, -y) // 移动线段起点
             }
             shape.lineTo(x, -y) // 从当前点画一条直线到(x,y)
+
+            points.push(new THREE.Vector2(x, -y))
           }
 
+          const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
+          const lineMaterial = new THREE.LineBasicMaterial({ color: 'white' })
+          const line = new THREE.Line(lineGeometry, lineMaterial)
+
+          line.position.z = 5
+          province.add(line)
+
           const geometry = new THREE.ShapeGeometry(shape)
-
-          const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
-
+          const material = new THREE.MeshBasicMaterial({ color: 'red' })
           const mesh = new THREE.Mesh(geometry, material)
-
+          mesh.position.z = 5
           province.add(mesh)
+
+          // const lineMaterial = new THREE.LineBasicMaterial({ color: 'white' })
+          // const line = new THREE.Line(geometry, lineMaterial)
+          // line.position.z = 5
+          // province.add(line)
         })
       })
 
@@ -609,5 +663,15 @@ export default class LMap {
     })
 
     this.scene.add(this.map)
+  }
+
+  // 绘制地面(平面)
+  initPlayGround() {
+    const geometry = new THREE.PlaneGeometry(1000, 1000)
+    const material = new THREE.MeshBasicMaterial({ color: 'rgb(4, 19, 40)' })
+    const plane = new THREE.Mesh(geometry, material)
+    // plane.rotation.x = -Math.PI / 2
+    // plane.position.y = -5
+    this.scene.add(plane)
   }
 }
