@@ -3,6 +3,12 @@ import * as d3 from 'd3'
 import TWEEN from '@tweenjs/tween.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { Line2 } from 'three/examples/jsm/lines/Line2'
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial'
+
+import dotsTexture from './textures/dots.png'
+// import hmbbTexture from './textures/hmbb.jpeg'
 
 import px from './textures/cube/px.png'
 import py from './textures/cube/py.png'
@@ -568,35 +574,22 @@ export default class LMap {
 
   initMap() {
     if (!this) {
-      const points = []
+      // const points = []
 
-      points.push(new THREE.Vector2(0, 0))
-      points.push(new THREE.Vector2(0, 10))
-      points.push(new THREE.Vector2(10, 10))
-      points.push(new THREE.Vector2(8, 6))
-      points.push(new THREE.Vector2(10, 0))
-      points.push(new THREE.Vector2(0, 0))
+      // points.push(new THREE.Vector2(0, 0))
+      // points.push(new THREE.Vector2(0, 10))
+      // points.push(new THREE.Vector2(10, 10))
+      // points.push(new THREE.Vector2(8, 6))
+      // points.push(new THREE.Vector2(10, 0))
+      // points.push(new THREE.Vector2(0, 0))
 
-      const geometry = new THREE.BufferGeometry().setFromPoints(points)
-      const material = new THREE.LineBasicMaterial({ color: 'white' })
-      const line = new THREE.Line(geometry, material)
-
-      line.position.z = 10
-      this.scene.add(line)
-
-      // const shape = new THREE.Shape() // Shape用来画多边形
-      // shape.moveTo(0, 0)
-      // shape.lineTo(0, 10)
-      // shape.lineTo(10, 10)
-      // shape.lineTo(8, 6)
-      // // shape.lineTo(5, 4)
-      // shape.lineTo(10, 0)
-      // shape.lineTo(0, 0)
-      // const geometry = new THREE.ShapeGeometry(shape)
+      // const geometry = new THREE.BufferGeometry().setFromPoints(points)
       // const material = new THREE.LineBasicMaterial({ color: 'white' })
-      // const mesh = new THREE.Line(geometry, material)
-      // mesh.position.z = 10
-      // this.scene.add(mesh)
+      // const line = new THREE.Line(geometry, material)
+
+      // line.position.z = 10
+      // this.scene.add(line)
+
       return
     }
 
@@ -606,6 +599,11 @@ export default class LMap {
 
     // 读取json数据
     const features = jsonData.features
+
+    const texture = new THREE.TextureLoader().load(dotsTexture)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    texture.repeat.set(4, 4)
 
     // 遍历json数据
     features.forEach((feature) => {
@@ -627,21 +625,44 @@ export default class LMap {
             }
             shape.lineTo(x, -y) // 从当前点画一条直线到(x,y)
 
-            points.push(new THREE.Vector2(x, -y))
+            // points.push(new THREE.Vector2(x, -y))
+            points.push(x, -y, 0)
           }
 
-          const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
-          const lineMaterial = new THREE.LineBasicMaterial({ color: 'white' })
-          const line = new THREE.Line(lineGeometry, lineMaterial)
+          // const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
+          // const lineMaterial = new THREE.LineBasicMaterial({ color: 'rgb(118, 206, 245)', linewidth: 5 })
+          const lineGeometry = new LineGeometry()
+          lineGeometry.setPositions(points)
+          const lineMaterial = new LineMaterial({
+            color: 'rgb(118, 206, 245)',
+            linewidth: 1.5,
+          })
+          // const line = new THREE.Line(lineGeometry, lineMaterial)
+          const line = new Line2(lineGeometry, lineMaterial)
+          lineMaterial.resolution.set(this.width, this.height)
 
+          line.computeLineDistances()
           line.position.z = 5
           province.add(line)
 
-          const geometry = new THREE.ShapeGeometry(shape)
-          const material = new THREE.MeshBasicMaterial({ color: 'red' })
-          const mesh = new THREE.Mesh(geometry, material)
-          mesh.position.z = 5
-          province.add(mesh)
+          // function genMapMesh() {
+          // 	const geometry = new THREE.ShapeGeometry(shape)
+          // 	const material = new THREE.MeshBasicMaterial({  })
+          // 	const mesh = new THREE.Mesh(geometry, material)
+          // 	province.add(mesh)
+          // 	return mesh
+          // }
+
+          // const mesh1 = genMapMesh()
+          // mesh1.material.map = texture
+          // mesh1.position.z = 5
+
+          // const mesh2 = genMapMesh()
+          // // 修改颜色
+          // mesh2.material.color = new THREE.Color('rgb(41, 110, 203)')
+          // mesh2.position.z = 4.7
+          // mesh2.position.y -= 0.3
+          // mesh2.position.x += 0.3
 
           // const lineMaterial = new THREE.LineBasicMaterial({ color: 'white' })
           // const line = new THREE.Line(geometry, lineMaterial)
