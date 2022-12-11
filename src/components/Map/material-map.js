@@ -4,6 +4,9 @@ import TWEEN from '@tweenjs/tween.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 
+import { CSM } from 'three/examples/jsm/csm/CSM.js'
+import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
+
 import px from './textures/cube/px.png'
 import py from './textures/cube/py.png'
 import pz from './textures/cube/pz.png'
@@ -16,22 +19,42 @@ import tag from './textures/tag.png'
 // 墨卡托投影转换
 const projection = d3
   .geoMercator()
-  .center([104.0, 37.5])
-  .scale(80)
+  // .center([104.0, 37.5])
+  .center([119.476498, 29.898918])
+  .scale(180)
   .translate([0, 0])
 
 // 地图材质颜色
 // const COLOR_ARR = [0x3C6EAB, 0x2F75AC, '#0465BD', '#4350C1', '#008495']
 // const COLOR_ARR = [0x3C6EAB, 0x2F75AC, '#0465BD', '#357bcb', '#408db3']
-// const COLOR_ARR = ['#0465BD', '#357bcb', '#3a7abd']
+const COLOR_ARR = ['#0465BD', '#357bcb', '#3a7abd']
 const HIGHT_COLOR = '#4fa5ff'
 
-export class lineMap {
+let csmHelper
+const params = {
+  orthographic: false,
+  fade: false,
+  far: 1000,
+  mode: 'practical',
+  // mode: 'uniform',
+  lightX: -1,
+  lightY: -1,
+  lightZ: -1,
+  margin: 100,
+  lightFar: 5000,
+  lightNear: 1,
+  autoUpdateHelper: true,
+  updateHelper: function () {
+    csmHelper.update()
+  },
+}
+
+export default class lineMap {
   constructor(container, el, options) {
     this.container = container ? container : document.body
     this.width = this.container.offsetWidth
     this.height = this.container.offsetHeight
-    this.provinceInfo = el // dom用来显示省份信息
+    this.provinceInfo = el
     const { tagClick = () => {} } = options
     this.tagClick = tagClick
   }
@@ -39,17 +62,20 @@ export class lineMap {
   init() {
     this.provinceInfo =
       this.provinceInfo || document.getElementById('provinceInfo')
-    this.group = new THREE.Object3D() // 标注（地名）
+    this.group = new THREE.Object3D() // 标注
 
     this.selectedObject = null
     // 渲染器
     // this.renderer = new THREE.WebGLRenderer();
     if (!this.renderer) {
-      // antialias - 是否执行抗锯齿
       this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     }
+    this.renderer.shadowMap.enabled = true // 开启阴影
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.25
     // this.renderer.outputEncoding = THREE.sRGBEncoding;
-    // this.renderer.outputEncoding = THREE.sHSVEncoding; // 已移除 ，只有sRGBEncoding和LinearEncoding
+    this.renderer.outputEncoding = THREE.sHSVEncoding
     this.renderer.setPixelRatio(window.devicePixelRatio)
     // 清除背景色，透明背景
     this.renderer.setClearColor(0xffffff, 0)
@@ -59,7 +85,7 @@ export class lineMap {
 
     // 场景
     this.scene = new THREE.Scene()
-    // this.scene.background = null
+    this.scene.background = null
 
     // probe
     this.lightProbe = new THREE.LightProbe()
@@ -74,11 +100,29 @@ export class lineMap {
       0.1,
       5000,
     )
-    this.camera.position.set(0, -40, 70)
+    this.camera.position.set(0, -15, 10)
     this.camera.lookAt(0, 0, 0)
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
     this.scene.add(ambientLight)
+
+    this.csm = new CSM({
+      maxFar: params.far,
+      cascades: 4,
+      mode: params.mode,
+      parent: this.scene,
+      shadowMapSize: 1024,
+      lightDirection: new THREE.Vector3(
+        params.lightX,
+        params.lightY,
+        params.lightZ,
+      ).normalize(),
+      camera: this.camera,
+    })
+
+    this.csmHelper = new CSMHelper(this.csm)
+    this.csmHelper.visible = false
+    this.scene.add(this.csmHelper)
 
     this.setController() // 设置控制
 
@@ -111,7 +155,7 @@ export class lineMap {
   loadMapData() {
     let _this = this
 
-    let jsonData = require('./json/china.json')
+    let jsonData = require('./json/zj.json')
 
     _this.initMap(jsonData)
   }
@@ -162,9 +206,7 @@ export class lineMap {
           const province = new THREE.Object3D()
           // 每个的 坐标 数组
           const coordinates = elem.geometry.coordinates
-          // const color = COLOR_ARR[index % COLOR_ARR.length]
-          // const color = '#0465BD'
-          const color = 'red'
+          const color = COLOR_ARR[index % COLOR_ARR.length]
           // 循环坐标数组
           coordinates.forEach((multiPolygon) => {
             multiPolygon.forEach((polygon) => {
@@ -179,13 +221,27 @@ export class lineMap {
                 shape.lineTo(x, -y)
               }
 
-              const geometry = new THREE.ShapeGeometry(shape)
+              const extrudeSettings = {
+                depth: 0.3,
+                // bevelEnabled: true,
+                // bevelSegments: 1,
+                // bevelThickness: 0.2,
+              }
 
-              const material = new THREE.MeshBasicMaterial({
+              const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
+
+              const material = new THREE.MeshStandardMaterial({
+                metalness: 1,
                 color: color,
               })
 
-              const mesh = new THREE.Mesh(geometry, [material])
+              const material1 = new THREE.MeshStandardMaterial({
+                metalness: 1,
+                roughness: 1,
+                color: color,
+              })
+
+              const mesh = new THREE.Mesh(geometry, [material, material1])
               if (index % 2 === 0) {
                 mesh.scale.set(1, 1, 1.2)
               }
@@ -309,14 +365,8 @@ export class lineMap {
 
     // 标注
     function onPointerMove() {
-      if (_this.selectedObject) {
-        _this.selectedObject.material.color.set(0xffffff)
-        _this.selectedObject = null
-      }
-
       if (_this.raycaster) {
-        const intersects = _this.raycaster.intersectObject(_this.group, true)
-        // console.log('select group', intersects)
+        const intersects = _this.raycaster.intersectObject(_this.map, true)
         if (intersects.length > 0) {
           const res = intersects.filter(function (res) {
             return res && res.object
@@ -324,7 +374,6 @@ export class lineMap {
 
           if (res && res.object) {
             _this.selectedObject = res.object
-            _this.selectedObject.material.color.set('#f00')
           }
         }
       }
@@ -334,8 +383,7 @@ export class lineMap {
     function onClick() {
       if (_this.selectedObject) {
         // 输出标注信息
-        console.log(_this.selectedObject._data)
-        _this.tagClick(_this.selectedObject._data)
+        console.log(_this.selectedObject)
       }
     }
     window.addEventListener('mousemove', onMouseMove, false)
@@ -356,7 +404,7 @@ export class lineMap {
       transparent: true,
     })
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(2000, 2000, 1, 1),
+      new THREE.PlaneGeometry(3000, 3000, 1, 1),
       groundMaterial,
     )
     // ground.rotation.x = - Math.PI / 2;
@@ -462,7 +510,9 @@ export class lineMap {
     }
     this.createProvinceInfo()
     this.camera.updateMatrixWorld()
+    this.csm.update()
     this.controller.update()
+    // csmHelper.update();
     if (!this.renderer) {
       this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     }
@@ -495,119 +545,5 @@ export class lineMap {
       this.renderer = null
     }
     window.removeEventListener('resize', this.resizeEventHandle)
-  }
-}
-
-export default class LMap {
-  constructor(container) {
-    this.container = container ? container : document.body
-    this.width = this.container.offsetWidth
-    this.height = this.container.offsetHeight
-    // this.group =  new THREE.Group() // 各省份的标注（地名）
-    this.renderer = null
-  }
-
-  init() {
-    this.initRenderer()
-    this.initScene()
-    this.initCamera()
-    this.initControls()
-
-    this.animate()
-
-    this.initMap()
-  }
-
-  initRenderer() {
-    this.renderer = new THREE.WebGLRenderer()
-    this.renderer.setPixelRatio(window.devicePixelRatio)
-    this.renderer.setSize(this.width, this.height)
-    this.container.appendChild(this.renderer.domElement)
-
-    return this.renderer
-  }
-
-  initScene() {
-    const scene = new THREE.Scene()
-    // scene.background = new THREE.Color(0x000000)
-    this.scene = scene
-    return scene
-  }
-
-  initCamera() {
-    const camera = new THREE.PerspectiveCamera(
-      45,
-      this.width / this.height,
-      1,
-      1000,
-    )
-    camera.position.set(0, 0, 100)
-    this.camera = camera
-    return camera
-  }
-
-  initControls() {
-    const controls = new OrbitControls(this.camera, this.renderer.domElement)
-    controls.update()
-    this.controls = controls
-  }
-
-  animate() {
-    requestAnimationFrame(this.animate.bind(this))
-    this.renderer.render(this.scene, this.camera)
-    this.controls.update()
-  }
-
-  initMap() {
-    const jsonData = require('./json/china.json')
-    // 建一个空对象存放对象
-    this.map = new THREE.Object3D()
-
-    // 读取json数据
-    const features = jsonData.features
-
-    // 遍历json数据
-    features.forEach((feature) => {
-      const province = new THREE.Object3D()
-
-      const coordinates = feature.geometry.coordinates
-
-      coordinates.forEach((multiPolygon) => {
-        // multiPolygon 每个省份的多边形数组
-        multiPolygon.forEach((polygon) => {
-          // polygon - 多边形 内部是多个点（坐标数组）
-          const shape = new THREE.Shape() // Shape用来画多边形
-
-          for (let i = 0; i < polygon.length; i++) {
-            let [x, y] = projection(polygon[i]) // 经纬度转二维投影坐标
-            if (i === 0) {
-              shape.moveTo(x, -y) // 移动线段起点
-            }
-            shape.lineTo(x, -y) // 从当前点画一条直线到(x,y)
-          }
-
-          const geometry = new THREE.ShapeGeometry(shape)
-
-          const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
-
-          const mesh = new THREE.Mesh(geometry, material)
-
-          province.add(mesh)
-        })
-      })
-
-      // 将geo的属性放到省份模型中
-      province.properties = feature.properties
-
-      if (feature.properties.centroid) {
-        // 面心坐标
-        const [x, y] = projection(feature.properties.centroid)
-        province.properties._centroid = [x, y]
-      }
-
-      this.map.add(province)
-    })
-
-    this.scene.add(this.map)
   }
 }

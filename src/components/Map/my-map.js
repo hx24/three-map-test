@@ -14,20 +14,23 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 
-// 引入CSS2DObject
-import {
-  CSS2DRenderer,
-  CSS2DObject,
-} from 'three/examples/jsm/renderers/CSS2DRenderer.js'
-
 import dotsTexture from './textures/alpha-dot2.png'
 // import dotsTexture from './textures/hmbb.jpeg'
+
+import px from './textures/cube/px.png'
+import py from './textures/cube/py.png'
+import pz from './textures/cube/pz.png'
+import nx from './textures/cube/nx.png'
+import ny from './textures/cube/ny.png'
+import nz from './textures/cube/nz.png'
+
+import tag from './textures/tag.png'
 
 // 墨卡托投影转换
 const projection = d3
   .geoMercator()
   // .center([104.0, 37.5])
-  .center([120.41, 29.58])
+  .center([120.153576,30.287459])
   .scale(160)
   .translate([0, 0])
 
@@ -40,7 +43,6 @@ const HIGHT_COLOR = '#4fa5ff'
 export default class LMap {
   constructor(container) {
     this.container = container ? container : document.body
-    this.cityInfo = document.getElementById('img')
     this.width = this.container.offsetWidth
     this.height = this.container.offsetHeight
     this.group = new THREE.Group() // 各省份的标注（地名）
@@ -52,7 +54,6 @@ export default class LMap {
     // 当前鼠标位置
     // 不设置初始值的话是0,0 这样在刷新页面时会直接触发在0，0位置的模型被选中
     this.mousePointer = new THREE.Vector2(1000, 1000)
-    this.cityMeshes = new THREE.Group()
   }
 
   init() {
@@ -62,7 +63,7 @@ export default class LMap {
     this.initControls()
     this.initAxis()
 
-    // this.createComposer()
+    this.createComposer()
     this.setResize()
     this.render()
     // this.initPlayGround()
@@ -72,7 +73,7 @@ export default class LMap {
   }
 
   initRenderer() {
-    this.renderer = new THREE.WebGLRenderer({ alpha: false })
+    this.renderer = new THREE.WebGLRenderer()
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.setSize(this.width, this.height)
     this.container.appendChild(this.renderer.domElement)
@@ -82,8 +83,7 @@ export default class LMap {
 
   initScene() {
     const scene = new THREE.Scene()
-    // scene.background = new THREE.Color('#01203f')
-    scene.background = new THREE.Color('white')
+    // scene.background = new THREE.Color(0x000000)
     this.scene = scene
     return scene
   }
@@ -95,7 +95,7 @@ export default class LMap {
       1,
       1000,
     )
-    camera.position.set(0, -10, 14)
+    camera.position.set(0, 0, 15)
     this.camera = camera
     this.camera.lookAt(new THREE.Vector3(0, 0, 0)) // 设置相机方向
     return camera
@@ -138,10 +138,6 @@ export default class LMap {
     const jsonData = require('./json/zj.json')
     // 建一个空对象存放对象
     this.map = new THREE.Object3D()
-    const cityMeshes = new THREE.Object3D()
-    cityMeshes.name = '城市集合'
-    const lineMeshes = new THREE.Object3D()
-    lineMeshes.name = '城市线集合'
 
     // 读取json数据
     const features = jsonData.features
@@ -152,12 +148,13 @@ export default class LMap {
     texture.repeat.set(0.5, 0.5) // 在一个纹理原图大小的基础上，重复多少次，1就是原图大小，2是在原图大小的基础上重复2次，则没张图显示为原来的一半
 
     // 遍历json数据
-    features.forEach((feature) => {
-      console.log('feature', feature)
+    features.forEach((feature, index) => {
       const provinceColor = new THREE.Color('rgb(13,47,104)')
-      const cityLines = new THREE.Object3D()
-      const cityExtrudes = new THREE.Object3D()
-      cityExtrudes.name = feature.properties.name
+      const province = new THREE.Object3D()
+      province._color = provinceColor
+      if (index === 0) {
+        this.province = province
+      }
       const coordinates = feature.geometry.coordinates
       coordinates.forEach((multiPolygon) => {
         // multiPolygon 每个省份的多边形数组
@@ -170,67 +167,52 @@ export default class LMap {
             shape.lineTo(x, -y)
             line_vertices.push(new THREE.Vector3(x, -y, 4.007)) // 4.01是为了让线条在立体图形的上面
           }
+
           const pathLine = this.drawLine(line_vertices)
-          cityLines.add(pathLine)
+          province.add(pathLine)
 
-          const extrudeSettings = {
-            depth: 0.3,
-            bevelEnabled: false,
+          // 使用shape创建平面
+          const genShapePlane = (z, level) => {
+            const geometry = new THREE.ShapeGeometry(shape)
+            const material = new THREE.MeshBasicMaterial({
+              color: provinceColor,
+              transparent: true,
+              opacity: 0.8
+            })
+            const mesh = new THREE.Mesh(geometry, material)
+            mesh._province = province
+            mesh._level = level
+            mesh.position.z = z
+            province.add(mesh)
+            return mesh
           }
-          const extrudeGeometry = new THREE.ExtrudeGeometry(
-            shape,
-            extrudeSettings,
-          )
-          const extrudeMaterial = new THREE.MeshBasicMaterial({
-            color: provinceColor || '#2defff',
-            transparent: true,
-            opacity: 0.8,
-          })
+          const shapePlane1 = genShapePlane(4, 1)
+          shapePlane1.material.alphaMap = texture
 
-          const extrudeMesh = new THREE.Mesh(extrudeGeometry, extrudeMaterial)
-          extrudeMesh.position.z = 3.7
-          extrudeMesh._selected = true
-          cityExtrudes.add(extrudeMesh)
+          const shapePlane2 = genShapePlane(3.95)
+          shapePlane2.material.color.set('rgb(40, 133, 236)')
+          const shapePlane3 = genShapePlane(3.9)
+          shapePlane3.material.color.set('rgb(23, 85, 169)')
+          const shapePlane4 = genShapePlane(3.85)
+          shapePlane4.material.color.set('rgb(16, 56, 131)')
 
+          // province.add(line)
           return
         })
       })
 
       // 将geo的属性放到省份模型中
-      cityExtrudes.properties = feature.properties
+      province.properties = feature.properties
 
       if (feature.properties.centroid) {
         // 面心坐标
         const [x, y] = projection(feature.properties.centroid)
-        cityExtrudes.properties._centroid = [x, y]
+        province.properties._centroid = [x, y]
       }
 
-      lineMeshes.add(cityLines)
-      cityMeshes.add(cityExtrudes)
-      this.genCityInfo(feature)
+      this.map.add(province)
     })
-    this.cityMeshes = cityMeshes
-
-    this.map.add(cityMeshes)
-    this.map.add(lineMeshes)
     this.scene.add(this.map)
-  }
-
-  genCityInfo(feature) {
-    const { properties } = feature
-    const { name } = properties
-    const { _centroid } = properties
-    const [x, y] = _centroid
-
-    const dom = document.createElement('div')
-    dom.style.position = 'absolute'
-    dom.style.color = '#fff'
-    dom.style['user-select'] = 'none'
-    dom.textContent = name
-
-    const sprite = new CSS2DObject(dom)
-    sprite.position.set(x, -y, 4.01)
-    this.map.add(sprite)
   }
 
   drawLine(points) {
@@ -241,7 +223,7 @@ export default class LMap {
     // create geometry
     var geometry = new threePath.PathGeometry()
     geometry.update(pathPointList, {
-      width: 0.01, // 线条宽度
+      width: 0.02, // 线条宽度
       arrow: false, // 是否显示箭头
     })
 
@@ -282,101 +264,68 @@ export default class LMap {
   // 设置选中高亮
   initRaycaster() {
     const { mousePointer } = this
-    const _this = this
 
     function onPointerMove(event) {
       // 将鼠标位置归一化为设备坐标。x 和 y 方向的取值范围是 (-1 to +1)
       mousePointer.x = (event.clientX / window.innerWidth) * 2 - 1
       mousePointer.y = -(event.clientY / window.innerHeight) * 2 + 1
     }
-
-    function onClick(event) {
-      if (_this.currentSelected) {
-        // 父级并非满屏，所以需要减去父级的left 和 top
-        let {
-          top,
-          left,
-        } = _this.container.getBoundingClientRect()
-        let clientX = event.clientX - left
-        let clientY = event.clientY - top
-  
-        const eventOffsetX = clientX
-        const eventOffsetY = clientY
-
-        _this.cityInfo.style.left = eventOffsetX + 10 + 'px'
-        _this.cityInfo.style.top = eventOffsetY - 20 + 'px'
-
-        console.log('', _this.cityInfo.style.left, _this.cityInfo.style.top)
-
-        const properties = _this.currentSelected
-        console.log('properties', properties)
-        const imgs = [require('@/assets/1.png'), require('@/assets/2.png')]
-        _this.cityInfo.src = imgs[Math.random() > 0.5 ? 0 : 1]
-        _this.cityInfo.style.visibility = 'visible'
-      } else {
-        _this.cityInfo.style.visibility = 'hidden'
-      }
-    }
-
     window.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('click', onClick)
-    window.addEventListener('mousedown', () => {
-      _this.cityInfo.style.visibility = 'hidden'
-    })
   }
 
   updateRaycaster() {
     const highlightColor = new THREE.Color(0xff0000)
-    const {
-      scene,
-      camera,
-      raycaster,
-      mousePointer,
-      currentSelected,
-      cityMeshes,
-    } = this
+    const { scene, camera, raycaster, mousePointer, currentSelected } = this
 
     const unLightCurrent = () => {
       if (currentSelected) {
-        currentSelected.material.opacity = 0.8
+        currentSelected.children.forEach((mesh) => {
+          if (mesh._level === 1) {
+            mesh.material.color = currentSelected._color
+          }
+        })
         this.currentSelected = null
       }
     }
 
     // 通过摄像机和鼠标位置更新射线
     raycaster.setFromCamera(mousePointer, camera)
-    
     // 计算物体和射线的焦点
-    const intersects = raycaster.intersectObjects(this.cityMeshes.children)
-    let selected
+    const intersects = raycaster.intersectObjects(scene.children)
+    let province
     for (const { object } of intersects) {
-      if (object._selected) {
-        selected = object
-        if (object !== currentSelected) {
+      province = object._province
+      if (province) {
+        if (province !== currentSelected) {
           unLightCurrent()
-          object.material.opacity = 1
-          this.currentSelected = object
+          province.children.forEach((mesh) => {
+            if (mesh._level === 1) {
+              mesh.material.color = highlightColor
+            }
+          })
+          this.currentSelected = province
         }
         break
       }
     }
 
-    if (!selected) {
+    if (!province) {
       // 取消高亮
       unLightCurrent()
     }
+
   }
 
   // 设置标注（地名）
   setTag() {
-    const { cityMeshes } = this
+    const { map } = this
     const tagGroup = new THREE.Group()
-    cityMeshes.children.forEach((city) => {
-      const { _centroid } = city.properties
+    map.children.forEach((province) => {
+      const { _centroid } = province.properties
       if (_centroid) {
         const [x, y] = _centroid
-        const tag = this.createSpriteTag(city.properties.name)
-        tag.position.set(x, -y, 4.6)
+        const tag = this.createSpriteTag(province.properties.name)
+        tag.position.set(x, -y, 4.2)
         tagGroup.add(tag)
       }
     })
@@ -386,10 +335,11 @@ export default class LMap {
   createSpriteTag(name) {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    const fontSize = 20
+    const fontSize = 60
     const padding = 5
     // 设置字重
     ctx.font = `bold ${fontSize}px Arial`
+    // ctx.font = `${fontSize}px Arial`
     const textWidth = ctx.measureText(name).width
     console.log('textWidth', textWidth)
     canvas.width = textWidth + padding * 2
@@ -405,14 +355,13 @@ export default class LMap {
     texture.needsUpdate = true
     const spriteMaterial = new THREE.SpriteMaterial({
       map: texture,
-      fog: false
-      // transparent: true,
+      transparent: true,
     })
     const sprite = new THREE.Sprite(spriteMaterial)
-    sprite.scale.set(0.6, 0.6, 1)
+    sprite.scale.set(0.4, 0.4, 1)
+    sprite.material.opacity = 0.7
     return sprite
   }
-
 
   render() {
     const delta = this.clock.getDelta() // 获取自上次调用的时间差
@@ -433,7 +382,7 @@ export default class LMap {
     this.renderer.render(this.scene, this.camera)
     this.composer && this.composer.render(delta) //效果组合器更新
 
-    this.updateRaycaster()
+    // this.updateRaycaster()
 
     requestAnimationFrame(this.render.bind(this))
   }
