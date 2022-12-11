@@ -10,7 +10,7 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 // import helvetiker from 'three/examples/fonts/helvetiker_regular.typeface.json'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 
-import dotsTexture from './textures/dot6.png'
+import dotsTexture from './textures/alpha-dot2.png'
 // import dotsTexture from './textures/hmbb.jpeg'
 
 import px from './textures/cube/px.png'
@@ -639,7 +639,6 @@ export default class LMap {
       })
       const line = new THREE.Line(geometry, material)
 
-
       // points = points.flatMap((point) => {
       //   return [point[0], point[1], 0]
       // })
@@ -674,12 +673,70 @@ export default class LMap {
     // 遍历json数据
     features.forEach((feature) => {
       const province = new THREE.Object3D()
-
       const coordinates = feature.geometry.coordinates
-
       coordinates.forEach((multiPolygon) => {
         // multiPolygon 每个省份的多边形数组
         multiPolygon.forEach((polygon) => {
+          if (this) {
+            const shape = new THREE.Shape()
+            const lineMaterial = new THREE.LineBasicMaterial({
+              color: '#FFF',
+              transparent: true,
+              opacity: 0.5,
+              scale: 2,
+            })
+            const lineGeometry = new THREE.BufferGeometry()
+            let line_vertices = []
+            for (let i = 0; i < polygon.length; i++) {
+              const [x, y] = projection(polygon[i])
+              if (i === 0) shape.moveTo(x, -y)
+              shape.lineTo(x, -y)
+              line_vertices.push(new THREE.Vector3(x, -y, 4.007)) // 4.01是为了让线条在立体图形的上面
+            }
+            lineGeometry.setFromPoints(line_vertices)
+
+            // const extrudeSettings = {
+            // 	depth: 4,
+            // 	bevelEnabled: false,
+            // }
+            // const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
+            // const material = new THREE.MeshBasicMaterial({
+            // 	color: '#069EF2',
+            // 	transparent: true,
+            // 	opacity: 0.6,
+            // 	map: texture,
+            // })
+            // const mesh = new THREE.Mesh(geometry, material)
+            // province.add(mesh)
+
+            // 使用shape创建平面
+            const genShapePlane = (z) => {
+              const geometry = new THREE.ShapeGeometry(shape)
+              const material = new THREE.MeshBasicMaterial({
+                color: 'rgb(13,47,104)',
+                transparent: true,
+                
+              })
+              const mesh = new THREE.Mesh(geometry, material)
+              mesh.position.z = z
+              province.add(mesh)
+							return mesh
+            }
+						const shapePlane1 = genShapePlane(4)
+						shapePlane1.material.alphaMap = texture
+
+						const shapePlane2 = genShapePlane(3.95)
+						shapePlane2.material.color.set('rgb(40, 133, 236)')
+						const shapePlane3 = genShapePlane(3.90)
+						shapePlane3.material.color.set('rgb(23, 85, 169)')
+						const shapePlane4 = genShapePlane(3.85)
+						shapePlane4.material.color.set('rgb(16, 56, 131)')
+
+            const line = new THREE.Line(lineGeometry, lineMaterial)
+            province.add(line)
+            return
+          }
+
           // polygon - 多边形 内部是多个点（坐标数组）
           const shape = new THREE.Shape() // Shape用来画多边形
 
