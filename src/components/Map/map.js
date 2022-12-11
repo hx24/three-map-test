@@ -9,6 +9,8 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 // import helvetiker from 'three/examples/fonts/helvetiker_regular.typeface.json'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
+import * as threePath from '@/assets/three.path/three.path.module'
+console.log(threePath);
 
 import dotsTexture from './textures/alpha-dot2.png'
 // import dotsTexture from './textures/hmbb.jpeg'
@@ -618,6 +620,40 @@ export default class LMap {
     }
   }
 
+  drawLine(points) {
+    // random vector3 points
+    // points = [
+    //   new THREE.Vector3(-5, 5, 10),
+    //   new THREE.Vector3(-5, -5, 10),
+    //   new THREE.Vector3(5, -5, 10),
+    //   new THREE.Vector3(2, 3, 10),
+    //   new THREE.Vector3(5, 5, 10),
+    // ]
+
+    var up = new THREE.Vector3(0, 0, 1)
+
+    // create PathPointList
+    var pathPointList = new threePath.PathPointList()
+    pathPointList.set(points, 0.3, 10, up, false) // 是否自动闭合
+
+    // create geometry
+    var geometry = new threePath.PathGeometry()
+    geometry.update(pathPointList, {
+      width: 0.05, // 线条宽度
+      arrow: false, // 是否显示箭头
+    })
+
+
+    var material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+    })
+
+    const mesh = new THREE.Mesh(geometry, material)
+    // mesh.layers.set(1)
+    // this.scene.add(mesh)
+    return mesh
+  }
+
   initMap() {
     if (!this) {
       let points = [
@@ -694,6 +730,9 @@ export default class LMap {
               line_vertices.push(new THREE.Vector3(x, -y, 4.007)) // 4.01是为了让线条在立体图形的上面
             }
             lineGeometry.setFromPoints(line_vertices)
+
+            const pathLine = this.drawLine(line_vertices)
+            province.add(pathLine)
 
             // const extrudeSettings = {
             // 	depth: 4,
@@ -877,7 +916,7 @@ export default class LMap {
 
     this.scene.add(this.group)
 
-    paintTag.call(this, 0.1)
+    // paintTag.call(this, 0.1)
 
     let tween = new TWEEN.Tween({ val: 0.1 })
       .to(
