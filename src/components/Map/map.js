@@ -29,8 +29,9 @@ import tag from './textures/tag.png'
 // 墨卡托投影转换
 const projection = d3
   .geoMercator()
-  .center([104.0, 37.5])
-  .scale(80)
+  // .center([104.0, 37.5])
+  .center([120.153576,30.287459])
+  .scale(160)
   .translate([0, 0])
 
 // 地图材质颜色
@@ -68,6 +69,7 @@ export default class LMap {
     // this.initPlayGround()
     this.initRaycaster()
     this.initMap()
+    this.setTag()
   }
 
   initRenderer() {
@@ -93,7 +95,7 @@ export default class LMap {
       1,
       1000,
     )
-    camera.position.set(0, 20, 80)
+    camera.position.set(0, 0, 15)
     this.camera = camera
     this.camera.lookAt(new THREE.Vector3(0, 0, 0)) // 设置相机方向
     return camera
@@ -133,7 +135,7 @@ export default class LMap {
   }
 
   initMap() {
-    const jsonData = require('./json/china.json')
+    const jsonData = require('./json/zj.json')
     // 建一个空对象存放对象
     this.map = new THREE.Object3D()
 
@@ -175,6 +177,7 @@ export default class LMap {
             const material = new THREE.MeshBasicMaterial({
               color: provinceColor,
               transparent: true,
+              opacity: 0.8
             })
             const mesh = new THREE.Mesh(geometry, material)
             mesh._province = province
@@ -220,12 +223,12 @@ export default class LMap {
     // create geometry
     var geometry = new threePath.PathGeometry()
     geometry.update(pathPointList, {
-      width: 0.05, // 线条宽度
+      width: 0.02, // 线条宽度
       arrow: false, // 是否显示箭头
     })
 
     var material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      color: new THREE.Color('#abe9f9'),
       side: THREE.DoubleSide,
       transparent: false,
     })
@@ -244,7 +247,7 @@ export default class LMap {
     // resolution: Vector2, strength: number, radius: number, threshold: number
     const unrealBloomPass = new UnrealBloomPass(
       new THREE.Vector2(this.width, this.height),
-      0.7,
+      0.4,
       1.1,
       0.18,
     )
@@ -278,7 +281,7 @@ export default class LMap {
       if (currentSelected) {
         currentSelected.children.forEach((mesh) => {
           if (mesh._level === 1) {
-            mesh.material.color =  currentSelected._color
+            mesh.material.color = currentSelected._color
           }
         })
         this.currentSelected = null
@@ -311,13 +314,54 @@ export default class LMap {
       unLightCurrent()
     }
 
-    // 只高亮一个
-    // const selectedObject = intersects.find(
-    //   (intersect) => intersect.object._canselect,
-    // )?.object
   }
 
-  setTag() {}
+  // 设置标注（地名）
+  setTag() {
+    const { map } = this
+    const tagGroup = new THREE.Group()
+    map.children.forEach((province) => {
+      const { _centroid } = province.properties
+      if (_centroid) {
+        const [x, y] = _centroid
+        const tag = this.createSpriteTag(province.properties.name)
+        tag.position.set(x, -y, 4.2)
+        tagGroup.add(tag)
+      }
+    })
+    this.scene.add(tagGroup)
+  }
+
+  createSpriteTag(name) {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const fontSize = 60
+    const padding = 5
+    // 设置字重
+    ctx.font = `bold ${fontSize}px Arial`
+    // ctx.font = `${fontSize}px Arial`
+    const textWidth = ctx.measureText(name).width
+    console.log('textWidth', textWidth)
+    canvas.width = textWidth + padding * 2
+    canvas.height = fontSize + padding * 2
+    ctx.font = `${fontSize}px Arial`
+    ctx.fillStyle = 'rgba(255, 255, 255, 0)'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // 设置字体颜色
+    ctx.fillStyle = '#fff'
+    ctx.fillText(name, padding, fontSize + padding)
+
+    const texture = new THREE.Texture(canvas)
+    texture.needsUpdate = true
+    const spriteMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+    })
+    const sprite = new THREE.Sprite(spriteMaterial)
+    sprite.scale.set(0.4, 0.4, 1)
+    sprite.material.opacity = 0.7
+    return sprite
+  }
 
   render() {
     const delta = this.clock.getDelta() // 获取自上次调用的时间差
@@ -338,7 +382,7 @@ export default class LMap {
     this.renderer.render(this.scene, this.camera)
     this.composer && this.composer.render(delta) //效果组合器更新
 
-    this.updateRaycaster()
+    // this.updateRaycaster()
 
     requestAnimationFrame(this.render.bind(this))
   }
