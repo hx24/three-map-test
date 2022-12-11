@@ -48,6 +48,11 @@ export default class LMap {
     this.renderer = null
     this.clock = new THREE.Clock()
     this.composer = null
+    this.currentSelected = null
+    this.raycaster = new THREE.Raycaster()
+    // 当前鼠标位置
+    // 不设置初始值的话是0,0 这样在刷新页面时会直接触发在0，0位置的模型被选中
+    this.mousePointer = new THREE.Vector2(1000, 1000)
   }
 
   init() {
@@ -60,13 +65,8 @@ export default class LMap {
     this.createComposer()
     this.setResize()
     this.render()
-
-    // this.initMap()
-
     // this.initPlayGround()
-
-    // this.setRaycaster()
-
+    this.initRaycaster()
     this.initMap()
   }
 
@@ -146,8 +146,13 @@ export default class LMap {
     texture.repeat.set(0.5, 0.5) // 在一个纹理原图大小的基础上，重复多少次，1就是原图大小，2是在原图大小的基础上重复2次，则没张图显示为原来的一半
 
     // 遍历json数据
-    features.forEach((feature) => {
+    features.forEach((feature, index) => {
+      const provinceColor = new THREE.Color('rgb(13,47,104)')
       const province = new THREE.Object3D()
+      province._color = provinceColor
+      if (index === 0) {
+        this.province = province
+      }
       const coordinates = feature.geometry.coordinates
       coordinates.forEach((multiPolygon) => {
         // multiPolygon 每个省份的多边形数组
@@ -165,18 +170,20 @@ export default class LMap {
           province.add(pathLine)
 
           // 使用shape创建平面
-          const genShapePlane = (z) => {
+          const genShapePlane = (z, level) => {
             const geometry = new THREE.ShapeGeometry(shape)
             const material = new THREE.MeshBasicMaterial({
-              color: 'rgb(13,47,104)',
+              color: provinceColor,
               transparent: true,
             })
             const mesh = new THREE.Mesh(geometry, material)
+            mesh._province = province
+            mesh._level = level
             mesh.position.z = z
             province.add(mesh)
             return mesh
           }
-          const shapePlane1 = genShapePlane(4)
+          const shapePlane1 = genShapePlane(4, 1)
           shapePlane1.material.alphaMap = texture
 
           const shapePlane2 = genShapePlane(3.95)
@@ -251,14 +258,63 @@ export default class LMap {
     this.composer.addPass(unrealBloomPass)
   }
 
-  createSphere() {
-    const geometry = new THREE.SphereGeometry(2, 20, 20)
-    const material = new THREE.MeshBasicMaterial({ color: 'skyblue' })
-    const sphere = new THREE.Mesh(geometry, material)
-    sphere.position.set(0, 0, 10)
-    // sphere.layers.set(1)
+  // 设置选中高亮
+  initRaycaster() {
+    const { mousePointer } = this
 
-    this.scene.add(sphere)
+    function onPointerMove(event) {
+      // 将鼠标位置归一化为设备坐标。x 和 y 方向的取值范围是 (-1 to +1)
+      mousePointer.x = (event.clientX / window.innerWidth) * 2 - 1
+      mousePointer.y = -(event.clientY / window.innerHeight) * 2 + 1
+    }
+    window.addEventListener('pointermove', onPointerMove)
+  }
+
+  updateRaycaster() {
+    const highlightColor = new THREE.Color(0xff0000)
+    const { scene, camera, raycaster, mousePointer, currentSelected } = this
+
+    const unLightCurrent = () => {
+      if (currentSelected) {
+        currentSelected.children.forEach((mesh) => {
+          if (mesh._level === 1) {
+            mesh.material.color =  currentSelected._color
+          }
+        })
+        this.currentSelected = null
+      }
+    }
+
+    // 通过摄像机和鼠标位置更新射线
+    raycaster.setFromCamera(mousePointer, camera)
+    // 计算物体和射线的焦点
+    const intersects = raycaster.intersectObjects(scene.children)
+    let province
+    for (const { object } of intersects) {
+      province = object._province
+      if (province) {
+        if (province !== currentSelected) {
+          unLightCurrent()
+          province.children.forEach((mesh) => {
+            if (mesh._level === 1) {
+              mesh.material.color = highlightColor
+            }
+          })
+          this.currentSelected = province
+        }
+        break
+      }
+    }
+
+    if (!province) {
+      // 取消高亮
+      unLightCurrent()
+    }
+
+    // 只高亮一个
+    // const selectedObject = intersects.find(
+    //   (intersect) => intersect.object._canselect,
+    // )?.object
   }
 
   setTag() {}
@@ -281,6 +337,8 @@ export default class LMap {
 
     this.renderer.render(this.scene, this.camera)
     this.composer && this.composer.render(delta) //效果组合器更新
+
+    this.updateRaycaster()
 
     requestAnimationFrame(this.render.bind(this))
   }
