@@ -45,6 +45,7 @@ export default class LMap {
     this.height = this.container.offsetHeight
     this.group = new THREE.Group() // 各省份的标注（地名）
     this.renderer = null
+    this.labelRenderer = null
     this.clock = new THREE.Clock()
     this.composer = null
     this.currentSelected = null
@@ -59,16 +60,19 @@ export default class LMap {
     this.initScene()
     this.initRenderer()
     this.initCamera()
-    this.initControls()
     this.initAxis()
 
     // this.createComposer()
     this.setResize()
-    this.render()
+    
+    this.initLabelRenderer()
+    this.initControls()
+
     // this.initPlayGround()
     this.initRaycaster()
     this.initMap()
-    this.setTag()
+    // this.setTag()
+    this.render()
   }
 
   initRenderer() {
@@ -76,8 +80,15 @@ export default class LMap {
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.setSize(this.width, this.height)
     this.container.appendChild(this.renderer.domElement)
-
     return this.renderer
+  }
+
+  initLabelRenderer() {
+    this.labelRenderer = new CSS2DRenderer()
+    this.labelRenderer.setSize(this.width, this.height)
+    this.labelRenderer.domElement.style.position = 'absolute'
+    this.labelRenderer.domElement.style.top = 0
+    this.container.appendChild(this.labelRenderer.domElement)
   }
 
   initScene() {
@@ -102,7 +113,7 @@ export default class LMap {
   }
 
   initControls() {
-    const controls = new OrbitControls(this.camera, this.renderer.domElement)
+    const controls = new OrbitControls(this.camera, this.labelRenderer.domElement)
     controls.update()
     this.controls = controls
   }
@@ -222,15 +233,15 @@ export default class LMap {
     const { _centroid } = properties
     const [x, y] = _centroid
 
-    const dom = document.createElement('div')
-    dom.style.position = 'absolute'
-    dom.style.color = '#fff'
-    dom.style['user-select'] = 'none'
-    dom.textContent = name
+    const labelDom = document.createElement('div')
+    labelDom.style.color = '#fff'
+    labelDom.textContent = name
 
-    const sprite = new CSS2DObject(dom)
+    const sprite = new CSS2DObject(labelDom)
+    // 在map中显示sprite
     sprite.position.set(x, -y, 4.01)
     this.map.add(sprite)
+
   }
 
   drawLine(points) {
@@ -430,6 +441,7 @@ export default class LMap {
     // this.camera.layers.set(0)
     // this.renderer.render(this.scene, this.camera)
 
+    this.labelRenderer.render(this.scene, this.camera)
     this.renderer.render(this.scene, this.camera)
     this.composer && this.composer.render(delta) //效果组合器更新
 
